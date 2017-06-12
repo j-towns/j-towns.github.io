@@ -3,6 +3,8 @@ layout: post
 title:  "A new trick for calculating Jacobian vector products"
 # categories: Autodiff optimization deep learning autograd theano
 ---
+__If you have any questions about this post please ask on [the discussion thread on /r/machinelearning](https://www.reddit.com/r/MachineLearning/comments/6gv978/first_blog_post_from_me_a_new_trick_for/).__
+
 __For a solid introduction to Automatic Differentiation, which is the subject of this blog post, see [Automatic differentiation in machine learning: a survey](https://arxiv.org/abs/1502.05767).__
 
 Last week I was involved in a [heated discussion thread](https://github.com/HIPS/autograd/pull/175) over on the [Autograd](https://github.com/HIPS/autograd) issue tracker. I'd recently been working on an implementation of forward mode automatic differentiation, which fits into Autograd's system for differentiating Python/Numpy code. Our discussion was about the usefulness of forward mode, which is equivalent to [Theano's Rop](http://deeplearning.net/software/theano/tutorial/gradients.html#r-operator) and in the general case is used to calculate directional derivatives, or equivalently for calculating _Jacobian vector products_.
