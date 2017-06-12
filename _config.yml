@@ -1,0 +1,11 @@
+title: deep yearning
+email: jamiehntownsend@gmail.com
+description: The blog of Jamie Townsend, a PhD student studying machine learning at University College London.
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "http://j-towns.github.io" # the base hostname & protocol for your site
+# twitter_username: jekyllrb
+github_username:  j-towns
+
+# Build settings
+markdown: kramdown
+theme: minima
