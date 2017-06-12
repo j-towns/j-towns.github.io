@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "A new trick for calculating Jacobian vector products"
-categories: Autodiff optimization deep learning autograd theano
+# categories: Autodiff optimization deep learning autograd theano
 ---
 __For a solid introduction to Automatic Differentiation, which is the subject of this blog post, see [Automatic differentiation in machine learning: a survey](https://arxiv.org/abs/1502.05767).__
 
