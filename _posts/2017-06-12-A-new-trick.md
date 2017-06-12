@@ -92,7 +92,7 @@ I prefer my notation, so I'm going to use `x` and `u` for those variables. The s
 def alternative_Rop(f, x, u):
 ```
 
-The `theano.tensor.Lop` API matches that of `Rop`. So `T.Lop(f, wrt, eval_points)` evaluates the Jacobian product of `f` with respect to `wrt`, left multiplied by the vector `eval_points`. Carefully tracing through the equations above, we can implement our alternative Rop. It's pretty simple:
+The `theano.tensor.Lop` API matches that of `Rop`. So `T.Lop(f, wrt, eval_points)` evaluates the Jacobian of `f` with respect to `wrt`, left multiplied by the vector `eval_points`. Carefully tracing through the equations above, we can implement our alternative Rop. It's pretty simple:
 
 
 ```python
