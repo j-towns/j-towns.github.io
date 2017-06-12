@@ -3,7 +3,7 @@ layout: post
 title:  "A new trick for calculating Jacobian vector products"
 # categories: Autodiff optimization deep learning autograd theano
 ---
-__If you have any questions about this post please ask on [the discussion thread on /r/machinelearning](https://www.reddit.com/r/MachineLearning/comments/6gv978/first_blog_post_from_me_a_new_trick_for/).__
+__If you have any questions about this post please ask on [the discussion thread on /r/machinelearning](https://www.reddit.com/r/MachineLearning/comments/6gvv0o/r_first_blog_post_a_new_trick_for_calculating/).__
 
 __For a solid introduction to Automatic Differentiation, which is the subject of this blog post, see [Automatic differentiation in machine learning: a survey](https://arxiv.org/abs/1502.05767).__
 
