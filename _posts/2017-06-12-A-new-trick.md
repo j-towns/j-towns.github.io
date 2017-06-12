@@ -184,7 +184,7 @@ display(Image(theano.printing.pydotprint(jvp, return_image=True, var_with_name_s
 ![png](/images/jvp/output_19_0.png)
 
 
-and the __alternative Rop__
+and our __alternative Rop__
 
 
 ```python
