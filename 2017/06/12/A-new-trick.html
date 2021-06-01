@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <title>A new trick for calculating Jacobian vector products</title>
+    <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
+
+    <link rel="stylesheet"
+          href="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.0.0/build/styles/default.min.css">
+    <script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.0.0/build/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</head>
+<body>
+<main class="page-content" aria-label="Content">
+        <script type="text/javascript" async
+  src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+<article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline">A new trick for calculating Jacobian vector products</h1>
+    <p class="post-meta">
+      <time datetime="2017-06-12T00:00:00+00:00" itemprop="datePublished">
+        
+        Jun 12, 2017
+      </time>
+      </p>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <p><strong>If you have any questions about this post please ask on <a
+        href="https://www.reddit.com/r/MachineLearning/comments/6gvv0o/r_first_blog_post_a_new_trick_for_calculating/">the
+        discussion thread on /r/machinelearning</a>.</strong></p>
+
+<p><strong>For a solid introduction to Automatic Differentiation, which is the
+  subject of this blog post, see <a
+    href="https://arxiv.org/abs/1502.05767">Automatic differentiation in
+    machine learning: a survey</a>.</strong></p>
+
+<p>Last week I was involved in a <a
+  href="https://github.com/HIPS/autograd/pull/175">heated discussion thread</a>
+over on the <a href="https://github.com/HIPS/autograd">Autograd</a> issue
+tracker. I’d recently been working on an implementation of forward mode
+automatic differentiation, which fits into Autograd’s system for
+differentiating Python/Numpy code. Our discussion was about the usefulness of
+forward mode, which is equivalent to <a
+href="http://deeplearning.net/software/theano/tutorial/gradients.html#r-operator">Theano’s
+Rop</a> and in the general case is used to calculate directional derivatives,
+or equivalently for calculating <em>Jacobian vector products</em>.</p>
+
+<p>Reverse mode automatic differentiation (also known as ‘backpropagation’), is
+well known to be extremely useful for calculating gradients of complicated
+functions. In the general case, reverse mode can be used to calculate the
+Jacobian of a function <em>left multiplied</em> by a vector. In the thread
+linked above, and in the Autograd codebase, any function which does this
+reverse mode vector-Jacobian product computation is abbreviated to
+<em>vjp</em>. The usefulness of a vjp operator, which takes a function as input
+and returns a new function for efficiently evaluating the original function’s
+vjp, is clearly beyond dispute — the familiar grad operator <script
+type="math/tex">\nabla</script> is a special case of such an operator. Such
+operators have now been implemented in different forms in many many machine
+learning software packages: TensorFlow, Theano, MXNet, Chainer, Torch, PyTorch,
+Caffe… etc etc.</p>
+
+<p>But how useful are the <em>Jacobian-vector products</em> (or jvps, as
+opposed to vjps), which are calculated by <em>forward mode</em> (as opposed to
+reverse mode), particularly in machine learning? Well they may be useful as a
+necessary step for efficiently calculating Hessian-vector products (hvps),
+which in turn are used for second order optimization (see e.g. <a
+href="http://www.cs.toronto.edu/~jmartens/docs/Deep_HessianFree.pdf">this
+paper</a>), although as I was arguing in the thread linked above, in an
+idealised implementation you can obtain an equivalent hvp computation by
+composing two reverse mode vjp operators (Lops in Theano).</p>
+
+<p>Later in the thread we were discussing another very specific use case for
+forward mode, that of computing generalised Gauss Newton matrix-vector
+products, when we happened upon a <em>new trick</em>: a method for calculating
+jvps by composing two reverse mode vjps! This could render specialised code for
+forward mode redundant. The trick is simple. I’ll demonstrate it first
+mathematically and then with Theano code.</p>
+
+<h1 id="the-trick">The trick</h1>
+<p>Firstly, note that our reverse mode operator takes a function as input and returns a function for computing vector-Jacobian products. In mathematical notation, if we have a function</p>
+
+<script type="math/tex; mode=display">f:\mathbb{R}^m \rightarrow \mathbb{R}^n</script>
+
+<p>then</p>
+
+<script type="math/tex; mode=display">\mathrm{vjp}(f)(v, x) = v^\top \frac{\partial f}{\partial x}(x)</script>
+
+<p>where <script type="math/tex">\frac{\partial f}{\partial x}</script> is shorthand for the <em>Jacobian matrix</em> of <script type="math/tex">f</script>:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+\frac{\partial f}{\partial x} = \begin{bmatrix} \frac{\partial f_1}{\partial x_1}&\cdots&\frac{\partial f_1}{\partial x_m}\\
+\vdots&\ddots&\vdots\\
+\frac{\partial f_n}{\partial x_1}&\cdots&\frac{\partial f_n}{\partial x_m}
+                                    \end{bmatrix}. %]]></script>
+
+<p>Now if we treat <script type="math/tex">x</script> as a constant, and consider the <em>transpose</em> of the above, which I will denote <script type="math/tex">g</script>, we have</p>
+
+<script type="math/tex; mode=display">g(v) = \left[\mathrm{vjp}(f)(v, x)\right]^\top = \left[\frac{\partial f}{\partial x}(x)\right]^\top v.</script>
+
+<p>Note that <script type="math/tex">g</script> is a <em>linear</em> function of <script type="math/tex">v</script>. The Jacobian of <script type="math/tex">g</script> is therefore constant (w.r.t. <script type="math/tex">v</script>), and equal to <script type="math/tex">\left[\frac{\partial f}{\partial x}(x)\right]^\top</script>, the transpose of the Jacobian of <script type="math/tex">f</script>.</p>
+
+<p>So what happens when we apply the vjp operator to <script type="math/tex">g</script>? We get</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+\begin{align}
+\mathrm{vjp}(g)(u, v) &= u^\top \frac{\partial g}{\partial v}(v) \\
+&=u^\top\left[\frac{\partial f}{\partial x}(x)\right]^\top \\
+&=\left[ \left[ \frac{\partial f}{\partial x}(x)\right] u \right]^\top
+\end{align} %]]></script>
+
+<p>The Jacobian of <script type="math/tex">f</script> is being right-multiplied by the vector <script type="math/tex">u</script> inside the bracket, and taking the transpose of the whole of the above yields</p>
+
+<script type="math/tex; mode=display">\left[\mathrm{vjp}(g)(u, v)\right]^\top = \left[ \frac{\partial f}{\partial x}(x)\right] u,</script>
+
+<p>the Jacobian of <script type="math/tex">f</script> right multiplied by the vector <script type="math/tex">u</script> — a Jacobian-vector product.</p>
+
+<h1 id="example-implementation-with-theano">Example implementation with Theano</h1>
+
+<p>In Theano the jvp operator is <code>theano.tensor.Rop</code> and the vjp
+operator is <code>theano.tensor.Lop</code>. I’m going to implement an
+‘alternative Rop’ using two applications of <code>theano.tensor.Lop</code>, and
+demonstrate that the computation graphs that it produces are the same as those
+produced by <code>theano.tensor.Rop</code>.</p>
+
+<p>Firstly import <code>theano.tensor</code>:</p>
+
+<pre><code class="language-python">import theano.tensor as T
+</code></pre>
+
+<p>and let’s take a quick look at the API for <code>Rop</code>, which we’ll want to copy for our alternative implementation:</p>
+
+<pre><code class="language-python">T.Rop?
+</code></pre>
+
+<pre><code class="language-plaintext">Signature: T.Rop(f, wrt, eval_points)
+Docstring:
+Computes the R operation on `f` wrt to `wrt` evaluated at points given
+in `eval_points`. Mathematically this stands for the jacobian of `f` wrt
+to `wrt` right muliplied by the eval points.
+</code></pre>
+
+<p>The important thing here is: <code>T.Rop(f, wrt, eval_points)</code> stands
+for ‘the jacobian of <code>f</code> wrt to <code>wrt</code> right muliplied by
+the eval points’. So <code>wrt</code> was what I denoted <script
+type="math/tex">x</script> above, and <code>eval_points</code> was denoted
+<script type="math/tex">u</script>.</p>
+
+<p>I prefer my notation, so I’m going to use <code>x</code> and <code>u</code>
+for those variables. The signature of our alternative_Rop is going to look like
+this:</p>
+
+<pre><code class="language-python">def alternative_Rop(f, x, u):
+</code></pre>
+
+<p>The <code>theano.tensor.Lop</code> API matches that of <code>Rop</code>. So <code>T.Lop(f, wrt, eval_points)</code> evaluates the Jacobian of <code>f</code> with respect to <code>wrt</code>, left multiplied by the vector <code>eval_points</code>. Carefully tracing through the equations above, we can implement our alternative Rop. It’s pretty simple:</p>
+
+<pre><code class="language-python">def alternative_Rop(f, x, u):
+    v = f.type('v')       # Dummy variable v of same type as f
+    g = T.Lop(f, x, v)    # Jacobian of f left multiplied by v
+    return T.Lop(g, v, u)
+</code></pre>
+
+<p>Note that we don’t need any transposes because the output of Theano’s Lop actually comes ready transposed.</p>
+
+<p>Let’s test this out on a real function and check that it gives us the same result as Theano’s default Rop. Firstly define an input variable and a function:</p>
+
+<pre><code class="language-python">x = T.vector('x')
+f = T.sin(T.sin(T.sin(x)))
+</code></pre>
+
+<p>and a variable to dot with the Jacobian of <code>f</code></p>
+
+<pre><code class="language-python">u = T.vector('u')
+</code></pre>
+
+<p>Then apply the original Rop and our alternative:</p>
+
+<pre><code class="language-python">jvp = T.Rop(f, x, u)
+alternative_jvp = alternative_Rop(f, x, u)
+</code></pre>
+
+<p>and compile them into Python functions</p>
+
+<pre><code class="language-python">import theano
+jvp_compiled = theano.function([x, u], jvp)
+alternative_jvp_compiled = theano.function([x, u], alternative_jvp)
+</code></pre>
+
+<p>Then evaluate the two functions to check they output the same thing:</p>
+
+<pre><code class="language-python">import numpy as np
+
+x_val = np.random.randn(3)
+u_val = np.random.randn(3)
+</code></pre>
+
+<pre><code class="language-python">jvp_compiled(x_val, u_val)
+</code></pre>
+
+<pre><code class="language-python">array([-2.17413113, -0.02833015, -0.08724173])
+</code></pre>
+
+<pre><code class="language-python">alternative_jvp_compiled(x_val, u_val)
+</code></pre>
+
+<pre><code class="language-python">array([-2.17413113, -0.02833015, -0.08724173])
+</code></pre>
+
+<p>The different versions seem to be doing the same computation, now to look at their computation graphs.</p>
+
+<p>Firstly the <strong>default Rop</strong></p>
+
+<pre><code class="language-python">from IPython.display import Image
+display(Image(theano.printing.pydotprint(jvp, return_image=True, var_with_name_simple=True)))
+</code></pre>
+
+<p><img src="/images/jvp/output_19_0.png" alt="png" width="540"/></p>
+
+<p>and our <strong>alternative Rop</strong></p>
+
+<pre><code class="language-python">display(Image(theano.printing.pydotprint(alternative_jvp, return_image=True, var_with_name_simple=True)))
+</code></pre>
+
+<p><img src="/images/jvp/output_21_0.png" alt="png" width="540" /></p>
+
+<p>The pre-compilation graphs above appear to have the same chain-like
+structure, although the graph produced by the alternative Rop actually looks a
+lot simpler (whether this is something that would happen for general functions
+I do not know). Notice the variable <code>v</code> doesn’t appear in the
+alternative Rop graph — Theano recognises that it’s irrelevant to the final
+computation. After compilation the graphs appear to be exactly the same (albeit
+with the positions of the <code>u</code> and <code>x</code> nodes swapped):</p>
+
+<pre><code class="language-python">display(Image(theano.printing.pydotprint(jvp_compiled, return_image=True, var_with_name_simple=True)))
+</code></pre>
+
+<p><img src="/images/jvp/output_23_0.png" alt="png" width="540"/></p>
+
+<pre><code class="language-python">display(Image(theano.printing.pydotprint(alternative_jvp_compiled, return_image=True, var_with_name_simple=True)))
+</code></pre>
+
+<p><img src="/images/jvp/output_24_0.png" alt="png" width="540" /></p>
+
+<h1 id="conclusions-and-notes">Conclusions and notes</h1>
+<p>Assuming the behavior above generalises to other Theano functions, it looks
+like much of the code implementing Rop in Theano may be unnecessary. For
+Autograd, the situation isn’t quite as simple. Autograd doesn’t do its
+differentiation ahead of time, and needs to trace a function’s execution in
+order to reverse-differentiate it. This makes our new trick, in its basic form,
+significantly less efficient than the <a
+href="https://github.com/BB-UCL/autograd-forward">forward mode
+implementation</a> that I’ve written.</p>
+
+<p>Some more discussion and a TensorFlow implementation can be found on the <a
+  href="https://github.com/renmengye/tensorflow-forward-ad/issues/2">tensorflow-forward-ad
+  issue tracker</a>. It’s quite likely that our ‘new’ trick is already known
+within the AD community, please email me if you have a reference for it and I
+will update this post.</p>
+
+  </div>
+
+  
+</article>
+
+    </main></body>
+</html>
