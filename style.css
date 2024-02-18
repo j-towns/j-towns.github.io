@@ -1,0 +1,17 @@
+body {
+  margin: 0px;
+  background-color: #e6e6e6;
+}
+
+#profile {
+  float: left;
+  margin: 8px 15px 2px 0px;
+}
+
+#main {
+  background-color: #d1d1d1;
+  max-width: 550px;
+  margin: 0px auto ;
+  padding: 10px 20px;
+}
+
